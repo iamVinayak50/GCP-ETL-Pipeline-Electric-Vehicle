@@ -7,8 +7,8 @@ from datetime import datetime, timezone
 from google.cloud import pubsub_v1
 import os
 
-service_account_path = r'c:\Users\vinay\Downloads\boxwood-axon-470816-b1-a21b5542b2c6.json'
-os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = service_account_path
+# service_account_path = r'c:\Users\vinay\Downloads\boxwood-axon-470816-b1-a21b5542b2c6.json'
+# os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = service_account_path
 
 
 PROJECT = "boxwood-axon-470816-b1"                   

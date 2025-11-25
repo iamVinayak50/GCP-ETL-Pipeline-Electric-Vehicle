@@ -1,96 +1,65 @@
-import json
-import argparse
 import apache_beam as beam
-from datetime import datetime
 from apache_beam.options.pipeline_options import PipelineOptions, StandardOptions
+from apache_beam.io.gcp.bigquery import WriteToBigQuery
+import json
 
+# -----------------------------
+# Pipeline Options
+# -----------------------------
+options = PipelineOptions(
+    project='boxwood-axon-470816-b1',
+    region='us-central1',
+    temp_location='gs://ev-raw/temp',
+    streaming=True,
+    runner='DataflowRunner',
+    job_name='pubsub-to-bq-simple'
+)
+options.view_as(StandardOptions).streaming = True
 
-# ------------------------
-# DQ + Error Handler
-# ------------------------
-def validate_and_clean(record):
-    """Returns (valid_record, None) or (None, error_record)"""
+# -----------------------------
+# Simple validation function
+# -----------------------------
+def validate_message(msg):
     try:
-        # Mandatory fields check
-        if not record.get("vehicle_id"):
-            raise ValueError("Missing vehicle_id")
-        if not record.get("timestamp"):
-            raise ValueError("Missing timestamp")
+        msg = json.loads(msg.decode('utf-8'))
+        required_fields = [
+            "vin", "vehicle_model", "timestamp", "gps_lat", "gps_lon",
+            "speed_kmph", "odometer_km", "state_of_charge_percent",
+            "state_of_health_percent", "motor_temp_c",
+            "charging_state", "charging_power_kw"
+        ]
+        for field in required_fields:
+            if field not in msg:
+                return None
+        # Convert numeric fields
+        for field in ["gps_lat","gps_lon","speed_kmph","odometer_km",
+                      "state_of_charge_percent","state_of_health_percent",
+                      "motor_temp_c","charging_power_kw"]:
+            msg[field] = float(msg[field])
+        return msg
+    except Exception:
+        return None
 
-        # Type validation
-        record["speed"] = float(record.get("speed", 0))
-        record["battery_level"] = float(record.get("battery_level", 0))
-
-        # Range validation
-        if record["battery_level"] < 0 or record["battery_level"] > 100:
-            raise ValueError("battery_level out of range")
-
-        # Add ingestion time
-        record["ingestion_time"] = datetime.utcnow().isoformat()
-
-        return (record, None)
-
-    except Exception as e:
-        # Send error record to DLQ
-        error_rec = {
-            "raw_data": str(record),
-            "error_message": str(e),
-            "error_time": datetime.utcnow().isoformat()
-        }
-        return (None, error_rec)
-
-
-# ------------------------
-# Main Pipeline
-# ------------------------
-def run():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--project", required=True)
-    parser.add_argument("--region", required=True)
-    parser.add_argument("--pubsub_topic", required=True)
-    parser.add_argument("--bq_valid_table", required=True)
-    parser.add_argument("--bq_error_table", required=True)
-    args, beam_args = parser.parse_known_args()
-
-    pipeline_options = PipelineOptions(
-        beam_args,
-        streaming=True,
-        save_main_session=True
+# -----------------------------
+# Pipeline
+# -----------------------------
+with beam.Pipeline(options=options) as p:
+    (
+        p
+        | 'ReadFromPubSub' >> beam.io.ReadFromPubSub(
+            subscription='projects/boxwood-axon-470816-b1/subscriptions/ev-telemetry-topic-sub'
+        )
+        | 'Validate' >> beam.Map(validate_message)
+        | 'FilterValid' >> beam.Filter(lambda x: x is not None)
+        | 'WriteToBigQuery' >> WriteToBigQuery(
+            table='boxwood-axon-470816-b1.bronze.bronze_ev_telemetry',
+            schema=(
+                'vin:STRING, vehicle_model:STRING, timestamp:STRING, '
+                'gps_lat:FLOAT, gps_lon:FLOAT, speed_kmph:FLOAT, odometer_km:FLOAT, '
+                'state_of_charge_percent:FLOAT, state_of_health_percent:FLOAT, '
+                'motor_temp_c:FLOAT, charging_state:STRING, charging_power_kw:FLOAT'
+            ),
+            write_disposition=beam.io.BigQueryDisposition.WRITE_APPEND,
+            create_disposition=beam.io.BigQueryDisposition.CREATE_IF_NEEDED
+        )
     )
-
-    pipeline_options.view_as(StandardOptions).streaming = True
-
-    with beam.Pipeline(options=pipeline_options) as p:
-
-        decoded = (
-            p
-            | "ReadFromPubSub" >> beam.io.ReadFromPubSub(topic=args.pubsub_topic)
-            | "Decode" >> beam.Map(lambda x: json.loads(x.decode("utf-8")))
-        )
-
-        # Apply validation logic
-        validated = decoded | "Validate" >> beam.Map(validate_and_clean)
-
-        valid = validated | "GetValid" >> beam.Filter(lambda x: x[0] is not None) \
-                          | beam.Map(lambda x: x[0])
-
-        errors = validated | "GetErrors" >> beam.Filter(lambda x: x[1] is not None) \
-                           | beam.Map(lambda x: x[1])
-
-        # Write valid records
-        valid | "WriteValidToBQ" >> beam.io.WriteToBigQuery(
-            table=args.bq_valid_table,
-            write_disposition=beam.io.BigQueryDisposition.WRITE_APPEND,
-            create_disposition=beam.io.BigQueryDisposition.CREATE_IF_NEEDED
-        )
-
-        # Write bad records
-        errors | "WriteErrorsToBQ" >> beam.io.WriteToBigQuery(
-            table=args.bq_error_table,
-            write_disposition=beam.io.BigQueryDisposition.WRITE_APPEND,
-            create_disposition=beam.io.BigQueryDisposition.CREATE_IF_NEEDED
-        )
-
-
-if __name__ == "__main__":
-    run()
