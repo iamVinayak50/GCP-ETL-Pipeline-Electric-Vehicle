@@ -1,80 +1,117 @@
-# 🚗🔋 EV Telemetry Real-Time Data Platform (GCP End-to-End Project)
+# 🚗 EV Real-Time Telemetry Data Pipeline (High-Level Overview)
 
-A complete real-time EV (Electric Vehicle) telemetry data pipeline built on **Google Cloud Platform** using:
-
-- Pub/Sub (real-time ingestion)  
-- Dataflow (stream processing)  
-- BigQuery (Bronze → Silver → Gold)  
-- Dataform (transformations, SQL automation)  
-- Cloud Monitoring (data quality & pipeline alerts)  
-- Tableau (dashboards and visualizations)  
-
-This project simulates a real-world scenario where an automotive company wants to **monitor EV performance, battery health, GPS movement, and system alerts** in real time.
+This project demonstrates an end-to-end **real-time data engineering pipeline** on Google Cloud Platform (GCP) for processing Electric Vehicle (EV) telemetry data.  
+The goal is to show how EV data can be collected, processed, cleaned, stored, transformed, and visualized in real time.
 
 ---
 
-# 🧩 **1. Business Goal**
+## 🔎 1. Business Need (Why this project?)
 
-The business needs **real-time visibility** into electric vehicle performance:
+Modern Electric Vehicles continuously generate telemetry such as:
+- GPS location  
+- Battery status (SOC/SOH)  
+- Speed & odometer  
+- Motor temperature  
+- Charging activity  
 
-- Monitor motor temperature, battery SOC/SOH  
-- Track vehicle location and speed  
-- Detect charging patterns  
-- Identify faults or overheating  
-- Generate operational dashboards  
-- Enable long-term analytics & forecasting  
+The business needs to:
+- Monitor vehicle health  
+- Improve battery performance  
+- Detect issues early (overheating, low SOC, faults)  
+- Analyze driving patterns  
+- Create dashboards for operations teams  
 
-This platform provides **clean, governed, high-quality data** for both real-time dashboards and analytics.
-
----
-
-# ⚙️ **2. Architecture Overview**
-
-
-### **Key Components**
-| Layer | Purpose |
-|-------|---------|
-| **Pub/Sub** | Ingest raw real-time telemetry |
-| **Dataflow** | Validations, cleaning, type casting |
-| **BigQuery Bronze** | Raw partitioned storage layer |
-| **Dataform** | SQL transformations (Silver/Gold) |
-| **BigQuery Silver** | Clean, validated, deduplicated data |
-| **BigQuery Gold** | Aggregated business metrics |
-| **Tableau** | Dashboards for fleet performance |
+This project provides a **real-time platform** to support these analytics.
 
 ---
 
-# 📥 **3. Data Ingestion — Pub/Sub**
+## 📡 2. High-Level Architecture
 
-Telemetry fields received from EV:
 
-- `vin`
-- `vehicle_model`
-- `timestamp`
-- `gps_lat`, `gps_lon`
-- `speed_kmph`
-- `odometer_km`
-- `state_of_charge_percent`
-- `state_of_health_percent`
-- `motor_temp_c`
-- `charging_state`
-- `charging_power_kw`
-
-A Pub/Sub subscription triggers Dataflow streaming pipeline.
+### Component Overview
+- **Pub/Sub**: Receives live telemetry events.
+- **Dataflow (Streaming)**: Cleans, validates, and processes each message.
+- **BigQuery Bronze**: Stores raw but structured events.
+- **Dataform (Silver)**: Cleans, deduplicates, and standardizes data.
+- **Dataform (Gold)**: Creates aggregated tables for dashboards.
+- **Tableau**: Visualizes battery performance, charging, model metrics, etc.
 
 ---
 
-# 🔄 **4. Real-Time Processing — Dataflow**
+## 🛠️ 3. Pipeline Summary
 
+### **1. Ingestion (Pub/Sub)**
+The EV backend publishes real-time messages to a Pub/Sub topic.
+
+### **2. Processing (Dataflow Streaming)**
 Dataflow performs:
-
 - JSON parsing  
-- Schema validation  
-- Missing field handling  
-- Numeric type conversion  
-- Range validations  
-- Dropping invalid messages  
-- Adding ingestion timestamp  
-- Writing to **Bronze BigQuery table**
+- Field validation  
+- Type conversions  
+- Dropping invalid data  
+- Writing valid rows into BigQuery  
 
-### **Bronze Table**
+### **3. Storage (BigQuery Bronze Layer)**
+Raw structured data is stored in a partitioned BigQuery table.
+
+### **4. Transformation (Dataform)**
+Dataform manages SQL transformations:
+- **Silver layer**: cleansed & validated data  
+- **Gold layer**: aggregated metrics for dashboards  
+
+### **5. Dashboarding (Tableau)**
+Final “Gold” tables are used in Tableau dashboards for:
+- Vehicle performance  
+- Battery health  
+- Charging behavior  
+- Model-level insights  
+
+---
+
+## 📊 4. What the Dashboard Shows
+
+- Battery SOC trends  
+- SOH degradation  
+- Charging vs driving patterns  
+- Motor temperature distribution  
+- Model-level summary metrics  
+- Fleet status overview  
+
+---
+
+## 🔍 5. Monitoring & Data Quality (High Level)
+
+The project includes:
+- Validation rules in Dataflow  
+- Basic checks in Silver (GPS range, SOC 0–100, temp limits)  
+- Cloud Monitoring alerts (pipeline failures, subscription lag)  
+- BigQuery partitioning for performance and governance  
+
+---
+
+## ✔️ 6. Key Skills Demonstrated
+
+- Real-time streaming pipelines  
+- BigQuery modeling (Bronze → Silver → Gold)  
+- Dataform workflow automation  
+- Data quality governance  
+- Dashboarding using Tableau  
+- End-to-end GCP data engineering architecture  
+
+---
+
+## 📦 7. Technology Stack
+
+- **Google Pub/Sub**  
+- **Apache Beam / Dataflow**  
+- **BigQuery**  
+- **Dataform**  
+- **Python**  
+- **Tableau Desktop**  
+
+---
+
+## 🎯 Summary
+
+This project is a complete, interview-ready real-time data engineering solution showing how EV telemetry moves from ingestion → processing → storage → transformation → visualization on GCP.
+
